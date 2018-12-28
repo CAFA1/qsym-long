@@ -29,7 +29,7 @@ MAX_CRASH_REPORTS = 30
 MIN_HANG_FILES = 30
 
 logger = logging.getLogger('qsym.afl')
-
+logger.setLevel(logging.DEBUG)
 def get_score(testcase):
     # New coverage is the best
     score1 = testcase.endswith("+cov")

@@ -12,7 +12,7 @@ import utils
 l = logging.getLogger('qsym.Executor')
 US_TO_S = float(1000 ** 2)
 LOG_SMT_HEADER = " [STAT] SMT:"
-
+l.setLevel(logging.DEBUG)
 class ExecutorResult(object):
     def __init__(self, start_time, end_time, returncode, log):
         self.returncode = returncode

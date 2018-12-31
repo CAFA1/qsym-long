@@ -187,10 +187,10 @@ def check_so_file():
                "--"
         ] + self.cmd
 
-        cmd, stdin = utils.fix_at_file(cmd, testcase)
+        cmd, stdin = utils.fix_at_file(cmd, testcase)//liu 若是@@替换成文件名，若无，则读出文件内容到stdin
         with open(os.devnull, "wb") as devnull:
             proc = sp.Popen(cmd, stdin=sp.PIPE, stdout=devnull, stderr=devnull)
-            proc.communicate(stdin)
+            proc.communicate(stdin)//liu 输入为stdin
 
         this_bitmap = read_bitmap_file(self.temp_file)
         return self.is_interesting_testcase(this_bitmap, proc.returncode) #liu 检查是否interesting
@@ -1043,9 +1043,21 @@ inline void setExprToReg(REG r, ExprRef e) {
 ```
 
 
-##### 3.3.5.2.2 jz
+##### 3.3.5.2.2 jz analyzeJcc(ins, JCC_Z, false);
 ```C
-
+void
+analyzeJcc(INS ins, JccKind jcc_kind, bool inv) {
+  INS_InsertCall(ins,
+      IPOINT_BEFORE,
+      (AFUNPTR)instrumentJcc,
+      IARG_FAST_ANALYSIS_CALL,
+      IARG_CPU_CONTEXT,
+      IARG_BRANCH_TAKEN,
+      IARG_BRANCH_TARGET_ADDR,
+      IARG_ARG(jcc_kind),
+      IARG_ARG(inv),
+      IARG_END);
+}
 ```
 
 ##### 3.3.5.2.3 mov
@@ -1057,9 +1069,743 @@ inline void setExprToReg(REG r, ExprRef e) {
 
 ### 3.3.6 PIN_AddInternalExceptionHandler(exceptionHandler, NULL); 异常处理
 ```C
+static EXCEPT_HANDLING_RESULT
+exceptionHandler(THREADID tid, EXCEPTION_INFO *pExceptInfo,
+		PHYSICAL_CONTEXT *pPhysCtxt, VOID *v) {
+	ADDRINT vaddr = 0x0;
 
+	// unaligned memory accesses
+	if (PIN_GetExceptionCode(pExceptInfo) ==
+			EXCEPTCODE_ACCESS_MISALIGNED) {
+		// clear EFLAGS.AC
+		PIN_SetPhysicalContextReg(pPhysCtxt, REG_EFLAGS,
+			CLEAR_EFLAGS_AC(PIN_GetPhysicalContextReg(pPhysCtxt,
+					REG_EFLAGS)));
+
+		// the exception is handled gracefully
+		return EHR_HANDLED;
+	}
+	// memory protection
+	else if (PIN_GetExceptionCode(pExceptInfo) ==
+			EXCEPTCODE_ACCESS_DENIED) {
+
+		// get the address of the memory violation
+		PIN_GetFaultyAccessAddress(pExceptInfo, &vaddr);
+
+    if (g_memory.isUnmappedAddress(vaddr)) {
+      std::cerr << "invalid access -- memory protection triggered\n";
+      exit(0);
+    }
+	}
+	return EHR_UNHANDLED;
+}
+
+```
+# 4. jz指令分析 analyzeJcc(ins, JCC_Z, false);
+```C
+void
+analyzeJcc(INS ins, JccKind jcc_kind, bool inv) {
+  INS_InsertCall(ins,
+      IPOINT_BEFORE,
+      (AFUNPTR)instrumentJcc,
+      IARG_FAST_ANALYSIS_CALL,
+      IARG_CPU_CONTEXT,
+      IARG_BRANCH_TAKEN, //liu 是否跳转
+      IARG_BRANCH_TARGET_ADDR,
+      IARG_ARG(jcc_kind),
+      IARG_ARG(inv),
+      IARG_END);
+}
+```
+## 4.1 instrumentJcc
+```C
+analyzeJcc(ins, JCC_Z, false);
+void
+instrumentJcc(ThreadContext* thread_ctx,
+    const CONTEXT* ctx,
+    bool taken, ADDRINT target,
+    JccKind jcc_c, bool inv) {
+  ExprRef e = thread_ctx->computeJcc(ctx, jcc_c, inv);//liu 计算jz表达式
+  if (e) {
+    ADDRINT pc = PIN_GetContextReg(ctx, REG_INST_PTR);
+    LOG_DEBUG("Symbolic branch at " + hexstr(pc) + ": " + e->toString() + "\n");
+#ifdef CONFIG_TRACE
+    trace_addJcc(e, ctx, taken);
+#endif
+    g_solver->addJcc(e, taken, pc); //liu 求解
+  }
+}
+```
+
+### 4.1.1 ExprRef e = thread_ctx->computeJcc(ctx, jcc_c, inv);计算jz表达式
+```C
+inline ExprRef computeJcc(const CONTEXT* ctx, JccKind jcc_c, bool inv) {
+      return eflags_.computeJcc(ctx, jcc_c, inv);
+    }
+
+ExprRef Eflags::computeJcc(const CONTEXT* ctx, JccKind jcc_c, bool inv) {
+  if (!isValid(jcc_c))
+    return NULL;
+  ExprRef e = computeFastJcc(ctx, jcc_c, inv);//liu 
+  if (e == NULL)
+    e = computeSlowJcc(ctx, jcc_c, inv); //liu
+  if (e == NULL) {
+    LOG_INFO("unhandled operation: jcc=" + std::to_string(jcc_c)
+        + ", inv=" + std::to_string(inv) + "\n");
+  }
+
+  return e;
+}
+```
+####4.1.1.1 computeFastJcc
+```C
+ExprRef Eflags::computeFastJcc(const CONTEXT* ctx,
+    JccKind jcc_c, bool inv) {
+  // check if last operation is CC_OP_SUB
+  OpKind kind = op_kinds_[start_];
+  FlagOperation* flag_op = operations_[kind];
+  UINT32 flags = getEflagsFromOpKind(kind);
+  Kind op;
+
+  if (kind == CC_OP_SUB) {
+    switch (jcc_c) {
+      case JCC_B:
+        op = Ult;
+        break;
+      case JCC_BE:
+        op = Ule;
+        break;
+      case JCC_L:
+        op = Slt;
+        break;
+      case JCC_LE:
+        op = Sle;
+        break;
+      case JCC_Z:
+        op = Equal;
+        break;
+      case JCC_S:
+        goto fast_jcc_s;
+      default:
+        return NULL;
+    }
+
+    if (inv)
+      op = negateKind(op);
+    ExprRef e = g_expr_builder->createBinaryExpr(op, flag_op->expr_dst(), flag_op->expr_src());
+    return e;
+  }
+
+fast_jcc_s:
+    // if operation is affected on ZF and SF
+    if ((flags & EFLAGS_SF)
+        && jcc_c == JCC_S) {
+        if (inv)
+          op = Sge;
+        else
+          op = Slt;
+    }
+    else if ((flags & EFLAGS_ZF)
+              && jcc_c == JCC_Z) {
+        if (inv)
+          op = Distinct;
+        else
+          op = Equal;
+    }
+    else {
+      // default case
+      return NULL;
+    }
+
+    ExprRef expr_zero = g_expr_builder->createConstant(0, flag_op->expr_result()->bits());
+    return g_expr_builder->createBinaryExpr(op, flag_op->expr_result(), expr_zero);
+}
+```
+####4.1.1.2 computeSlowJcc
+```C
+ExprRef Eflags::computeSlowJcc(const CONTEXT* ctx, JccKind jcc_c, bool inv) {
+  ExprRef e = NULL;
+  bool equal = false;
+
+  switch (jcc_c) {
+    case JCC_BE:
+      equal = true;
+    case JCC_B:
+      e = computeFlag(EFLAGS_CF);
+      break;
+    case JCC_LE:
+      equal = true;
+    case JCC_L:
+      e = computeFlag(EFLAGS_SF);
+      e = g_expr_builder->createDistinct(e, computeFlag(EFLAGS_OF));
+      break;
+    case JCC_S:
+      e = computeFlag(EFLAGS_SF);
+      break;
+    case JCC_Z:
+      e = computeFlag(EFLAGS_ZF);//liu jz
+    case JCC_O:
+      e = computeFlag(EFLAGS_OF);
+      break;
+    case JCC_P:
+      e = computeFlag(EFLAGS_PF);
+      break;
+    default:
+      UNREACHABLE();
+      return NULL;
+  }
+
+  if (equal)
+    e = g_expr_builder->createLOr(e, computeFlag(EFLAGS_ZF));
+
+  if (inv)
+    e = g_expr_builder->createLNot(e);
+
+  return e;
+}
+```
+##### 4.1.1.2.1 e = computeFlag(EFLAGS_ZF); jz
+```C
+ExprRef Eflags::computeFlag(Eflag flag) {
+  for (INT i = 0; i < CC_OP_LAST; i++) {
+    UINT32 start = (start_ - i) % CC_OP_LAST;
+    /* liu
+    enum OpKind {
+        // from QEMU
+        CC_OP_ADD,
+        CC_OP_SUB,
+        CC_OP_LOGIC,
+        CC_OP_INC,
+        CC_OP_DEC,
+        CC_OP_SHL,
+        CC_OP_SHR,
+        CC_OP_ROR,
+        CC_OP_ROL,
+        CC_OP_SMUL,
+        CC_OP_UMUL,
+        CC_OP_BT,
+        CC_OP_LAST
+        };
+    */
+    OpKind op_kind = op_kinds_[start];
+    /* liu
+    OpKind op_kinds_[CC_OP_LAST]; //liu EFLAGS的私有成员变量
+
+    */
+    FlagOperation *flag_op = operations_[op_kind];
+
+    if ((flag_op->flags() & flag) != 0) {
+      // the flag is generated by this operation
+
+      switch (flag) {
+        case EFLAGS_CF:
+          return flag_op->computeCF();
+        case EFLAGS_PF:
+          return flag_op->computePF();
+        case EFLAGS_ZF:
+          return flag_op->computeZF(); //liu
+        case EFLAGS_SF:
+          return flag_op->computeSF();
+        case EFLAGS_OF:
+          return flag_op->computeOF();
+        default:
+          return NULL;
+      }
+    }
+  }
+
+  // we could not find the operation for the flag
+  return NULL;
+}
+```
+##### 4.1.1.2.2 return flag_op->computeZF(); //liu
+```c
+ExprRef FlagOperation::computeZF() {
+  ExprRef zero = g_expr_builder->createConstant(0, expr_result_->bits());
+  return g_expr_builder->createBinaryExpr(Equal, expr_result_, zero);
+}
+```
+### 4.1.2 g_solver->addJcc(e, taken, pc);  求解
+```C
+void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc) {
+  // Save the last instruction pointer for debugging
+  last_pc_ = pc;
+
+  if (e->isConcrete())
+    return;
+
+  // if e == Bool(true), then ignore
+  if (e->kind() == Bool) {
+    assert(!(castAs<BoolExpr>(e)->value()  ^ taken));
+    return;
+  }
+
+  assert(isRelational(e.get()));
+
+  // check duplication before really solving something,
+  // some can be handled by range based constraint solving
+  bool is_interesting;
+  if (pc == 0) {
+    // If addJcc() is called by special case, then rely on last_interested_
+    is_interesting = last_interested_;
+  }
+  else
+    is_interesting = isInterestingJcc(e, taken, pc); //liu 是感兴趣的吗？
+
+  if (is_interesting)
+    negatePath(e, taken); //liu 翻转分支点
+  addConstraint(e, taken, is_interesting); //liu 添加约束
+}
+```
+#### 4.1.2.0 is_interesting = isInterestingJcc(e, taken, pc); //liu 是感兴趣的吗？
+```c
+bool Solver::isInterestingJcc(ExprRef rel_expr, bool taken, ADDRINT pc) {
+  bool interesting = trace_.isInterestingBranch(pc, taken); //liu 
+  // record for other decision
+  last_interested_ = interesting;
+  return interesting;
+}
+
+bool AflTraceMap::isInterestingBranch(ADDRINT pc, bool taken) {
+  ADDRINT h = hashPc(pc, taken);
+  ADDRINT idx = getIndex(h);
+  bool new_context = isInterestingContext(h, virgin_map_[idx]);
+  bool ret = true;
+
+  virgin_map_[idx]++;
+
+  if ((virgin_map_[idx] | trace_map_[idx]) != trace_map_[idx]) {//liu 新的状态
+    ADDRINT inv_h = hashPc(pc, !taken);
+    ADDRINT inv_idx = getIndex(inv_h);
+
+    trace_map_[idx] |= virgin_map_[idx];
+
+    // mark the inverse case, because it's already covered by current testcase
+    virgin_map_[inv_idx]++;
+
+    trace_map_[inv_idx] |= virgin_map_[inv_idx];
+    commit();
+
+    virgin_map_[inv_idx]--;
+    ret = true;
+  }
+  else if (new_context) {
+    ret = true;
+    commit();
+  }
+  else
+    ret = false;
+
+  prev_loc_ = h;
+  return ret;
+}
+```
+#### 4.1.2.1 negatePath(e, taken); //liu 翻转分支点
+```C
+void Solver::negatePath(ExprRef e, bool taken) {
+  reset();
+  syncConstraints(e);
+  addToSolver(e, !taken);//liu 
+  bool sat = checkAndSave();//liu
+  if (!sat) {
+    reset();
+    // optimistic solving
+    addToSolver(e, !taken);
+    checkAndSave("optimistic");
+  }
+}
+```
+##### 4.1.2.1.1 addToSolver(e, !taken);//liu 
+```C
+void Solver::addToSolver(ExprRef e, bool taken) {
+  e->simplify();
+  if (!taken)
+    e = g_expr_builder->createLNot(e);//liu 翻转
+  add(e->toZ3Expr());
+}
+
+ExprRef ConstantFoldingExprBuilder::createLNot(ExprRef e) {
+  if (BoolExprRef be = castAs<BoolExpr>(e))
+    return createBool(!be->value());
+  else
+    return ExprBuilder::createLNot(e);
+}
+
+```
+##### 4.1.2.1.2 bool sat = checkAndSave();//liu
+```C
+bool Solver::checkAndSave(const std::string& postfix) {
+  if (check() == z3::sat) {//liu 检查是否可解
+    saveValues(postfix); //liu 保存求解值
+    return true;
+  }
+  else {
+    LOG_DEBUG("unsat\n");
+    return false;
+  }
+}
+```
+###### 4.1.2.1.2.1 if (check() == z3::sat) {//liu 
+```C
+z3::check_result Solver::check() {
+  uint64_t before = getTimeStamp();
+  z3::check_result res;
+  LOG_STAT(
+      "SMT: { \"solving_time\": " + decstr(solving_time_) + ", "
+      + "\"total_time\": " + decstr(before - start_time_) + " }\n");
+  // LOG_DEBUG("Constraints: " + solver_.to_smt2() + "\n");
+  try {
+    res = solver_.check();//liu z3的check
+  }
+  catch(z3::exception e) {
+    // https://github.com/Z3Prover/z3/issues/419
+    // timeout can cause exception
+    res = z3::unknown;
+  }
+  uint64_t cur = getTimeStamp();
+  uint64_t elapsed = cur - before;
+  solving_time_ += elapsed;
+  LOG_STAT("SMT: { \"solving_time\": " + decstr(solving_time_) + " }\n");
+  return res;
+}
+```
+###### 4.1.2.1.2.2 saveValues(postfix); //liu 保存求解值
+```C
+void Solver::saveValues(const std::string& postfix) {
+  std::vector<UINT8> values = getConcreteValues();//liu solve
+
+  // If no output directory is specified, then just print it out
+  if (out_dir_.empty()) {
+    printValues(values);
+    return;
+  }
+
+  std::string fname = out_dir_+ "/" + toString6digit(num_generated_); //liu outdir
+  // Add postfix to record where it is genereated
+  if (!postfix.empty())
+      fname = fname + "-" + postfix;
+  ofstream of(fname, std::ofstream::out | std::ofstream::binary);
+  LOG_INFO("New testcase: " + fname + "\n");
+  if (of.fail())
+    LOG_FATAL("Unable to open a file to write results\n");
+
+      // TODO: batch write
+      for (unsigned i = 0; i < values.size(); i++) {
+        char val = values[i];
+        of.write(&val, sizeof(val));
+      }
+
+  of.close();
+  num_generated_++;
+}
+```
+###### 4.1.2.1.2.3 std::vector<UINT8> values = getConcreteValues();//liu solve
+```C
+std::vector<UINT8> Solver::getConcreteValues() {
+  // TODO: change from real input
+  z3::model m = solver_.get_model();//liu z3 solve
+  unsigned num_constants = m.num_consts();
+  std::vector<UINT8> values = inputs_;
+  for (unsigned i = 0; i < num_constants; i++) {
+    z3::func_decl decl = m.get_const_decl(i);//liu Return the i-th constant in the given model.
+    z3::expr e = m.get_const_interp(decl);
+    z3::symbol name = decl.name();
+
+    if (name.kind() == Z3_INT_SYMBOL) {
+      int value = e.get_numeral_int(); //liu Return int value of numeral
+      values[name.to_int()] = (UINT8)value;
+    }
+  }
+  return values;
+}
+```
+
+#### 4.1.2.2 addConstraint(e, taken, is_interesting); //liu 添加约束
+```C
+void Solver::addConstraint(ExprRef e, bool taken, bool is_interesting) {
+  if (auto NE = castAs<LNotExpr>(e)) {
+    addConstraint(NE->expr(), !taken, is_interesting);
+    return;
+  }
+  if (!addRangeConstraint(e, taken))
+    addNormalConstraint(e, taken);
+}
 ```
 
 
+# 5. pintool调试
+## 5.1 run_qsym.py脚本
+```bash
+python bin/run_qsym.py -i test/1.txt -o test/out/ test/mywps 
+```
+
+## 5.2 pin命令，5.1打印出的
+```bash
+third_party/pin-2.14-71313-gcc.4.4.7-linux/pin -pause_tool 20  -ifeellucky -t /home/long/qsym/qsym-master/venv/lib/python2.7/site-packages/qsym/pintool/obj-intel64/libqsym.so -logfile test/out/pin.log -i test/1.txt -s 1 -d 1 -o test/out -- test/mywps
+
+third_party/pin-2.14-71313-gcc.4.4.7-linux/pin  -ifeellucky -t /home/long/qsym/qsym-master/venv/lib/python2.7/site-packages/qsym/pintool/obj-intel64/libqsym.so -logfile test/out/pin.log -i test/1.txt -s 1 -d 1 -o test/out -- test/mywps
+```
+
+## 5.3 pinbin gdb
+```bash
+cd third_party/pin-2.14-71313-gcc.4.4.7-linux/intel64/bin
+gdb -q pinbin
+attach 
+add-symbol
+dir /home/long/qsym/qsym-master/qsym/pintool  #设置源码搜索目录
+
+```
+
+# 6. z3 solver的例子
+## 6.1 github sample
+```C
+//https://github.com/Z3Prover/z3/blob/master/examples/c%2B%2B/example.cpp
+/**
+   Demonstration of how Z3 can be used to prove validity of
+   De Morgan's Duality Law: {e not(x and y) <-> (not x) or ( not y) }
+*/
+void demorgan() {
+    std::cout << "de-Morgan example\n";
+    
+    context c;
+
+    expr x = c.bool_const("x");
+    expr y = c.bool_const("y");
+    expr conjecture = (!(x && y)) == (!x || !y);
+    
+    solver s(c);
+    // adding the negation of the conjecture as a constraint.
+    s.add(!conjecture);
+    std::cout << s << "\n";
+    std::cout << s.to_smt2() << "\n";
+    switch (s.check()) {
+    case unsat:   std::cout << "de-Morgan is valid\n"; break;
+    case sat:     std::cout << "de-Morgan is not valid\n"; break;
+    case unknown: std::cout << "unknown\n"; break;
+    }
+}
+
+/**
+   \brief Find a model for <tt>x >= 1 and y < x + 3</tt>.
+*/
+void find_model_example1() {
+    std::cout << "find_model_example1\n";
+    context c;
+    expr x = c.int_const("x");
+    expr y = c.int_const("y");
+    solver s(c);
+
+    s.add(x >= 1);
+    s.add(y < x + 3);
+    std::cout << s.check() << "\n";
+
+    model m = s.get_model();
+    std::cout << m << "\n";
+    // traversing the model
+    for (unsigned i = 0; i < m.size(); i++) {
+        func_decl v = m[i];
+        // this problem contains only constants
+        assert(v.arity() == 0); 
+        std::cout << v.name() << " = " << m.get_const_interp(v) << "\n";
+    }
+    // we can evaluate expressions in the model.
+    std::cout << "x + y + 1 = " << m.eval(x + y + 1) << "\n";
+}
+
+/**
+   \brief Prove <tt>x = y implies g(x) = g(y)</tt>, and
+   disprove <tt>x = y implies g(g(x)) = g(y)</tt>.
+   This function demonstrates how to create uninterpreted types and
+   functions.
+*/
+void prove_example1() {
+    std::cout << "prove_example1\n";
+    
+    context c;
+    expr x      = c.int_const("x");
+    expr y      = c.int_const("y");
+    sort I      = c.int_sort();
+    func_decl g = function("g", I, I);
+    
+    solver s(c);
+    expr conjecture1 = implies(x == y, g(x) == g(y));
+    std::cout << "conjecture 1\n" << conjecture1 << "\n";
+    s.add(!conjecture1);
+    if (s.check() == unsat) 
+        std::cout << "proved" << "\n";
+    else
+        std::cout << "failed to prove" << "\n";
+
+    s.reset(); // remove all assertions from solver s
+
+    expr conjecture2 = implies(x == y, g(g(x)) == g(y));
+    std::cout << "conjecture 2\n" << conjecture2 << "\n";
+    s.add(!conjecture2);
+    if (s.check() == unsat) {
+        std::cout << "proved" << "\n";
+    }
+    else {
+        std::cout << "failed to prove" << "\n";
+        model m = s.get_model();
+        std::cout << "counterexample:\n" << m << "\n";
+        std::cout << "g(g(x)) = " << m.eval(g(g(x))) << "\n";
+        std::cout << "g(y)    = " << m.eval(g(y)) << "\n";
+    }
+}
 
 
+
+```
+# 7. read 污点引入
+```c
+kSyscallDesc[__NR_read] = SyscallDesc{3, 1, 0, {0, 0, 0, 0, 0, 0}, NULL, postReadHook};
+
+void
+postReadHook(SyscallContext *ctx) {
+  if (unlikely((long)ctx->ret <= 0))
+    return;
+
+  // taint-source
+  if (kFdSet.find(ctx->arg[SYSCALL_ARG0]) != kFdSet.end())//liu 污染源句柄
+    g_memory.makeExpr(ctx->arg[SYSCALL_ARG1], ctx->ret);//liu 符号化
+  else
+    g_memory.clearExprFromMem(ctx->arg[SYSCALL_ARG1], ctx->ret);
+}
+```
+## 7.1 g_memory.makeExpr(ctx->arg[SYSCALL_ARG1], ctx->ret);//liu 符号化
+```c
+  inline void makeExpr(ADDRINT addr, INT32 size) {
+    LOG_DEBUG("makeExpr: addr=" + hexstr(addr)
+        + ", size=" + hexstr(size) + "\n");
+    for (INT32 i = 0; i < size; i++)
+      makeExpr(addr + i); //liu
+  }
+
+  inline void makeExpr(ADDRINT addr) {
+    ExprRef e = g_expr_builder->createRead(off_++); //liu 建立符号名称
+    setExprToMem(addr, e);//liu 存入内存
+  }
+```
+### 7.1.0 LOG_DEBUG
+```c
+#define LOG_DEBUG(msg) \
+  do { \
+    if (isDebugMode()) \
+      log("DEBUG", msg); \
+  } while(0);
+
+bool isDebugMode() {
+  return g_opt_debug.Value();
+}
+
+KNOB<bool> g_opt_debug(KNOB_MODE_WRITEONCE, "pintool",
+    "d", "0", "turn on debug mode");//liu pin命令选项加上-d
+
+void log(const char* tag, const std::string &msg) {
+  std::string tagged_msg = std::string("[") + tag + "] " + msg;
+  std::cerr << tagged_msg;
+
+  LOG(tagged_msg);
+}
+
+```
+### 7.1.1 ExprRef e = g_expr_builder->createRead(off_++); //liu 建立符号名称
+```c
+ExprRef BaseExprBuilder::createRead(ADDRINT off) {
+  static std::vector<ExprRef> cache;
+  if (off >= cache.size()) //liu cache
+    cache.resize(off + 1);
+
+  if (cache[off] == NULL)
+    cache[off] = std::make_shared<ReadExpr>(off);//liu 相当于new了一个ReadExpr类对象
+
+  return cache[off];
+}
+
+class ReadExpr : public NonConstantExpr {
+public:
+  ReadExpr(UINT32 index)
+    : NonConstantExpr(Read, 8), index_(index) {
+    deps_ = new DepSet();//liu typedef std::set<INT32> DepSet;
+    deps_->insert(index);
+    isConcrete_ = false;
+  }
+
+  std::string getName() const override { //liu
+    return "Read";
+  }
+
+  inline UINT32 index() const { return index_; } //liu
+  static bool classOf(const Expr& e) { return e.kind() == Read; } //liu
+
+protected:
+  bool printAux(ostream& os) const override {
+    os << "index=" << hexstr(index_);
+    return true;
+  }
+
+  z3::expr toZ3ExprRecursively(bool verbose) override {
+    z3::symbol symbol = context_.int_symbol(index_);
+    z3::sort sort = context_.bv_sort(8);
+    return context_.constant(symbol, sort);
+  }
+
+  void hashAux(XXH32_state_t* state) override {
+    XXH32_update(state, &index_, sizeof(index_));
+  }
+
+  bool equalAux(const Expr& other) const override {
+    const ReadExpr& typed_other = static_cast<const ReadExpr&>(other);
+    return index_ == typed_other.index();
+  }
+
+  ExprRef evaluateImpl() override;
+  UINT32 index_;
+};
+```
+### 7.1.2 setExprToMem(addr, e);//liu 存入内存
+```c
+inline void setExprToMem(ADDRINT addr, ExprRef e) {
+    if (e == NULL) {
+      clearExprFromMem(addr);
+      return;
+    }
+    else {
+      clearExprFromMem(addr);//liu 清除
+      *getExprPtrFromMem(addr) = e;//liu 赋值
+    }
+  }
+```
+#### 7.1.2.1 clearExprFromMem(addr);//liu 清除
+```c
+
+```
+#### 7.1.2.2 *getExprPtrFromMem(addr) = e;//liu 赋值
+```c
+inline ExprRef* getExprPtrFromMem(ADDRINT addr) {
+    ExprRef* page = getPage(addr); //liu 找到页面
+    // NOTE: this could happen due to ASLR
+    // If we have better way to find stack address,
+    // then this code could be removed
+    if (page == NULL)
+      return zero_page_;
+    return &page[addressToOffset(addr)]; //liu 找到页面里偏移
+  }
+```
+##### 7.1.2.2.1 ExprRef* page = getPage(addr); //liu 找到页面
+```c
+  inline ExprRef* getPage(ADDRINT addr) {
+    auto it = page_table_.find(addressToPageIndex(addr));//liu std::unordered_map<ADDRINT, ExprRef*> page_table_; memory的成员变量
+    if (it == page_table_.end())
+      return NULL;
+    else
+      return it->second;
+  }
+```
+##### 7.1.2.2.2 return &page[addressToOffset(addr)]; //liu 找到页面里偏移
+```c
+inline ADDRINT addressToOffset(ADDRINT addr) {
+  return addr & kPageMask;
+}
+
+```

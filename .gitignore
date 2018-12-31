@@ -12,6 +12,9 @@ pintool.log
 /build
 /venv
 /.cache
-
+test/out/
 # pytest
 .pytest_cache
+.gdb_history
+*.pyc
+*peda-session-pinbin.txt

@@ -1453,7 +1453,7 @@ z3::check_result Solver::check() {
   LOG_STAT(
       "SMT: { \"solving_time\": " + decstr(solving_time_) + ", "
       + "\"total_time\": " + decstr(before - start_time_) + " }\n");
-  // LOG_DEBUG("Constraints: " + solver_.to_smt2() + "\n");
+  // LOG_DEBUG("Constraints: " + solver_.to_smt2() + "\n");//liu 可打印求解约束
   try {
     res = solver_.check();//liu z3的check
   }
@@ -1541,9 +1541,9 @@ python bin/run_qsym.py -i test/1.txt -o test/out/ test/mywps
 
 ## 5.2 pin命令，5.1打印出的
 ```bash
-third_party/pin-2.14-71313-gcc.4.4.7-linux/pin -pause_tool 20  -ifeellucky -t /home/long/qsym/qsym-master/venv/lib/python2.7/site-packages/qsym/pintool/obj-intel64/libqsym.so -logfile test/out/pin.log -i test/1.txt -s 1 -d 1 -o test/out -- test/mywps
+third_party/pin-2.14-71313-gcc.4.4.7-linux/pin -pause_tool 20  -ifeellucky -t ./qsym/pintool/obj-intel64/libqsym.so -logfile test/out/pin.log -i test/1.txt -s 1 -d 1 -o test/out -- test/mywps
 
-third_party/pin-2.14-71313-gcc.4.4.7-linux/pin  -ifeellucky -t /home/long/qsym/qsym-master/venv/lib/python2.7/site-packages/qsym/pintool/obj-intel64/libqsym.so -logfile test/out/pin.log -i test/1.txt -s 1 -d 1 -o test/out -- test/mywps
+third_party/pin-2.14-71313-gcc.4.4.7-linux/pin  -ifeellucky -t ./qsym/pintool/obj-intel64/libqsym.so -logfile test/out/pin.log -i test/1.txt -s 1 -d 1 -o test/out -- test/mywps
 ```
 
 ## 5.3 pinbin gdb

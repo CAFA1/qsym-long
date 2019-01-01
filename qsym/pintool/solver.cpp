@@ -325,7 +325,9 @@ void Solver::saveValues(const std::string& postfix) {
   if (!postfix.empty())
       fname = fname + "-" + postfix;
   ofstream of(fname, std::ofstream::out | std::ofstream::binary);
-  LOG_INFO("New testcase: " + fname + "\n");
+  LOG_INFO("New testcase1: " + fname + "\n");
+  //liu debug output values
+  printValues(values);
   if (of.fail())
     LOG_FATAL("Unable to open a file to write results\n");
 

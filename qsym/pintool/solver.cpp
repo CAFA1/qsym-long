@@ -130,7 +130,7 @@ z3::check_result Solver::check() {
   LOG_STAT(
       "SMT: { \"solving_time\": " + decstr(solving_time_) + ", "
       + "\"total_time\": " + decstr(before - start_time_) + " }\n");
-   LOG_DEBUG("Constraints: " + solver_.to_smt2() + "\n");
+   LOG_DEBUG("Constraints: " + solver_.to_smt2() + "\n");//long 
   try {
     res = solver_.check();
   }

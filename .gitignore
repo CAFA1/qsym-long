@@ -12,7 +12,7 @@ pintool.log
 /build
 /venv
 /.cache
-test/out/
+*/out/
 # pytest
 .pytest_cache
 .gdb_history

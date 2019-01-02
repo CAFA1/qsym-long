@@ -20,10 +20,11 @@ output_dict=dict()
 for file1 in file_names:
 	#print file1
 	try:
-		myinput = open(file1,'r')
-		content=myinput.read()
-		if content not in output_dict:
-			output_dict[content]=file1
+		if(file1.find('pin.log')==-1):
+			myinput = open(file1,'r')
+			content=myinput.read()
+			if content not in output_dict:
+				output_dict[content]=file1
 	except:
 		pass
 

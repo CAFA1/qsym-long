@@ -1129,6 +1129,20 @@ instrumentJcc(ThreadContext* thread_ctx,
   if (e) {
     ADDRINT pc = PIN_GetContextReg(ctx, REG_INST_PTR);
     LOG_DEBUG("Symbolic branch at " + hexstr(pc) + ": " + e->toString() + "\n");
+    /*liu 
+    [DEBUG] Symbolic branch at 0x000400674: LNot(Equal(0x0, 0xFFFFFF9C + (0x0 | Read(index=0x0)))) //liu 实际就是第一个字符是d
+    [DEBUG] Symbolic branch at 0x7fac1e2432da: 
+    LNot
+        (Equal
+            (0xFFF, 
+                LShr(
+                    Extract(index=7, bits=1, 0x1 + (Ite(Equal(0x0, Read(index=0x4)), 0xFF, 0x0))) 
+                    | Extract(index=7, bits=1, Ite(Equal(0xA, Read(index=0x3)), 0xFF, 0x0)) 
+                    | Extract(index=7, bits=1, Ite(Equal(0x72, Read(index=0x2)), 0xFF, 0x0)) 
+                    | Extract(index=7, bits=1, Ite(Equal(0x69, Read(index=0x1)), 0xFF, 0x0)) 
+                    | Extract(index=7, bits=1, Ite(Equal(0x64, Read(index=0x0)), 0xFF, 0x0)) 
+                    , 0x4)))
+    */
 #ifdef CONFIG_TRACE
     trace_addJcc(e, ctx, taken);
 #endif
@@ -1444,6 +1458,85 @@ bool Solver::checkAndSave(const std::string& postfix) {
     return false;
   }
 }
+/*
+(concat (_ BitVec i) (_ BitVec j) (_ BitVec m))
+  - concatenation of bitvectors of size i and j to get a new bitvector of
+    size m, where m = i + j
+((_ extract i j) (_ BitVec m) (_ BitVec n))
+  - extraction of bits i down to j from a bitvector of size m to yield a
+    new bitvector of size n, where n = i - j + 1
+(bvadd (_ BitVec m) (_ BitVec m) (_ BitVec m))
+      - addition modulo 2^m
+  - Bitvector Constants:
+    (_ bvX n) where X and n are numerals, i.e. (_ bv13 32),
+    abbreviates the term #bY of sort (_ BitVec n) such that
+
+    [[#bY]] = nat2bv[n](X) for X=0, ..., 2^n - 1.
+
+    See the specification of the theory's semantics for a definition
+    of the functions [[_]] and nat2bv.  Note that this convention implicitly
+    considers the numeral X as a number written in base 10.
+      
+
+[DEBUG] Constraints: ; 
+(set-info :status unknown)
+(declare-fun k!00 () (_ BitVec 8))
+(declare-fun k!10 () (_ BitVec 8))
+(declare-fun k!20 () (_ BitVec 8))
+(declare-fun k!30 () (_ BitVec 8))
+(declare-fun k!40 () (_ BitVec 8))
+(assert
+ (let 
+ ((?x80 (concat //liu ?x80为变量，值为concat的结果
+ 	(_ bv0 27) //liu bv0 bv114都是十进制的值，后面跟的是bit数
+ 	((_ extract 7 7) (bvadd (_ bv1 8) (ite (= k!40 (_ bv0 8)) (_ bv255 8) (_ bv0 8)))) 
+ 	(ite (= k!30 (_ bv10 8)) (_ bv1 1) (_ bv0 1)) 
+ 	(ite (= k!20 (_ bv114 8)) (_ bv1 1) (_ bv0 1)) 
+ 	(ite (= k!10 (_ bv105 8)) (_ bv1 1) (_ bv0 1)) 
+ 	(ite (= k!00 (_ bv100 8)) (_ bv1 1) (_ bv0 1)))))
+ (or (bvsle ?x80 (_ bv4094 32)) (bvsle (_ bv4096 32) ?x80))))
+(assert
+ (let ((?x942 (concat (_ bv0 27) ((_ extract 7 7) (bvadd (_ bv1 8) (ite (= k!40 (_ bv0 8)) (_ bv255 8) (_ bv0 8)))) (_ bv15 4))))
+(let ((?x739 (bvadd (_ bv4095 32) (bvmul (_ bv4294967295 32) ?x942))))
+(let ((?x1086 (ite (= ((_ extract 30 30) ?x739) (_ bv1 1)) (_ bv30 64) (ite (= ((_ extract 31 31) ?x739) (_ bv1 1)) (_ bv31 64) (_ bv64 64)))))
+(let ((?x799 (ite (= ((_ extract 28 28) ?x739) (_ bv1 1)) (_ bv28 64) (ite (= ((_ extract 29 29) ?x739) (_ bv1 1)) (_ bv29 64) ?x1086))))
+(let ((?x798 (ite (= ((_ extract 26 26) ?x739) (_ bv1 1)) (_ bv26 64) (ite (= ((_ extract 27 27) ?x739) (_ bv1 1)) (_ bv27 64) ?x799))))
+(let ((?x1098 (ite (= ((_ extract 24 24) ?x739) (_ bv1 1)) (_ bv24 64) (ite (= ((_ extract 25 25) ?x739) (_ bv1 1)) (_ bv25 64) ?x798))))
+(let ((?x448 (ite (= ((_ extract 22 22) ?x739) (_ bv1 1)) (_ bv22 64) (ite (= ((_ extract 23 23) ?x739) (_ bv1 1)) (_ bv23 64) ?x1098))))
+(let ((?x741 (ite (= ((_ extract 20 20) ?x739) (_ bv1 1)) (_ bv20 64) (ite (= ((_ extract 21 21) ?x739) (_ bv1 1)) (_ bv21 64) ?x448))))
+(let ((?x962 (ite (= ((_ extract 18 18) ?x739) (_ bv1 1)) (_ bv18 64) (ite (= ((_ extract 19 19) ?x739) (_ bv1 1)) (_ bv19 64) ?x741))))
+(let ((?x998 (ite (= ((_ extract 16 16) ?x739) (_ bv1 1)) (_ bv16 64) (ite (= ((_ extract 17 17) ?x739) (_ bv1 1)) (_ bv17 64) ?x962))))
+(let ((?x492 (ite (= ((_ extract 14 14) ?x739) (_ bv1 1)) (_ bv14 64) (ite (= ((_ extract 15 15) ?x739) (_ bv1 1)) (_ bv15 64) ?x998))))
+(let ((?x1168 (ite (= ((_ extract 12 12) ?x739) (_ bv1 1)) (_ bv12 64) (ite (= ((_ extract 13 13) ?x739) (_ bv1 1)) (_ bv13 64) ?x492))))
+(let ((?x782 (ite (= ((_ extract 10 10) ?x739) (_ bv1 1)) (_ bv10 64) (ite (= ((_ extract 11 11) ?x739) (_ bv1 1)) (_ bv11 64) ?x1168))))
+(let ((?x1177 (ite (= ((_ extract 8 8) ?x739) (_ bv1 1)) (_ bv8 64) (ite (= ((_ extract 9 9) ?x739) (_ bv1 1)) (_ bv9 64) ?x782))))
+(let ((?x552 (ite (= ((_ extract 6 6) ?x739) (_ bv1 1)) (_ bv6 64) (ite (= ((_ extract 7 7) ?x739) (_ bv1 1)) (_ bv7 64) ?x1177))))
+(let ((?x304 (ite (= ((_ extract 4 4) ?x739) (_ bv1 1)) (_ bv4 64) (ite (= ((_ extract 5 5) ?x739) (_ bv1 1)) (_ bv5 64) ?x552))))
+(let ((?x1038 (ite (= ((_ extract 2 2) ?x739) (_ bv1 1)) (_ bv2 64) (ite (= ((_ extract 3 3) ?x739) (_ bv1 1)) (_ bv3 64) ?x304))))
+(let ((?x80 (concat (_ bv0 27) ((_ extract 7 7) (bvadd (_ bv1 8) (ite (= k!40 (_ bv0 8)) (_ bv255 8) (_ bv0 8)))) (ite (= k!30 (_ bv10 8)) (_ bv1 1) (_ bv0 1)) (ite (= k!20 (_ bv114 8)) (_ bv1 1) (_ bv0 1)) (ite (= k!10 (_ bv105 8)) (_ bv1 1) (_ bv0 1)) (ite (= k!00 (_ bv100 8)) (_ bv1 1) (_ bv0 1)))))
+(let ((?x791 (bvadd (_ bv4095 32) (bvmul (_ bv4294967295 32) ?x80))))
+(let ((?x606 (ite (= ((_ extract 30 30) ?x791) (_ bv1 1)) (_ bv30 64) (ite (= ((_ extract 31 31) ?x791) (_ bv1 1)) (_ bv31 64) (_ bv64 64)))))
+(let ((?x1253 (ite (= ((_ extract 28 28) ?x791) (_ bv1 1)) (_ bv28 64) (ite (= ((_ extract 29 29) ?x791) (_ bv1 1)) (_ bv29 64) ?x606))))
+(let ((?x534 (ite (= ((_ extract 26 26) ?x791) (_ bv1 1)) (_ bv26 64) (ite (= ((_ extract 27 27) ?x791) (_ bv1 1)) (_ bv27 64) ?x1253))))
+(let ((?x267 (ite (= ((_ extract 24 24) ?x791) (_ bv1 1)) (_ bv24 64) (ite (= ((_ extract 25 25) ?x791) (_ bv1 1)) (_ bv25 64) ?x534))))
+(let ((?x811 (ite (= ((_ extract 22 22) ?x791) (_ bv1 1)) (_ bv22 64) (ite (= ((_ extract 23 23) ?x791) (_ bv1 1)) (_ bv23 64) ?x267))))
+(let ((?x889 (ite (= ((_ extract 20 20) ?x791) (_ bv1 1)) (_ bv20 64) (ite (= ((_ extract 21 21) ?x791) (_ bv1 1)) (_ bv21 64) ?x811))))
+(let ((?x363 (ite (= ((_ extract 18 18) ?x791) (_ bv1 1)) (_ bv18 64) (ite (= ((_ extract 19 19) ?x791) (_ bv1 1)) (_ bv19 64) ?x889))))
+(let ((?x375 (ite (= ((_ extract 16 16) ?x791) (_ bv1 1)) (_ bv16 64) (ite (= ((_ extract 17 17) ?x791) (_ bv1 1)) (_ bv17 64) ?x363))))
+(let ((?x1128 (ite (= ((_ extract 14 14) ?x791) (_ bv1 1)) (_ bv14 64) (ite (= ((_ extract 15 15) ?x791) (_ bv1 1)) (_ bv15 64) ?x375))))
+(let ((?x1252 (ite (= ((_ extract 12 12) ?x791) (_ bv1 1)) (_ bv12 64) (ite (= ((_ extract 13 13) ?x791) (_ bv1 1)) (_ bv13 64) ?x1128))))
+(let ((?x1044 (ite (= ((_ extract 10 10) ?x791) (_ bv1 1)) (_ bv10 64) (ite (= ((_ extract 11 11) ?x791) (_ bv1 1)) (_ bv11 64) ?x1252))))
+(let ((?x546 (ite (= ((_ extract 8 8) ?x791) (_ bv1 1)) (_ bv8 64) (ite (= ((_ extract 9 9) ?x791) (_ bv1 1)) (_ bv9 64) ?x1044))))
+(let ((?x288 (ite (= ((_ extract 6 6) ?x791) (_ bv1 1)) (_ bv6 64) (ite (= ((_ extract 7 7) ?x791) (_ bv1 1)) (_ bv7 64) ?x546))))
+(let ((?x688 (ite (= ((_ extract 4 4) ?x791) (_ bv1 1)) (_ bv4 64) (ite (= ((_ extract 5 5) ?x791) (_ bv1 1)) (_ bv5 64) ?x288))))
+(let ((?x359 (ite (= ((_ extract 2 2) ?x791) (_ bv1 1)) (_ bv2 64) (ite (= ((_ extract 3 3) ?x791) (_ bv1 1)) (_ bv3 64) ?x688))))
+(let ((?x787 (ite (= (ite (= k!00 (_ bv100 8)) (_ bv1 1) (_ bv0 1)) (_ bv0 1)) (_ bv0 64) (ite (= ((_ extract 1 1) ?x791) (_ bv1 1)) (_ bv1 64) ?x359))))
+(= ?x787 (ite (= ((_ extract 1 1) ?x739) (_ bv1 1)) (_ bv1 64) ?x1038))))))))))))))))))))))))))))))))))))))
+(check-sat)
+
+
+*/
+
 ```
 ###### 4.1.2.1.2.1 if (check() == z3::sat) {//liu 
 ```C
@@ -1544,6 +1637,8 @@ python bin/run_qsym.py -i test/1.txt -o test/out/ test/mywps
 third_party/pin-2.14-71313-gcc.4.4.7-linux/pin -pause_tool 20  -ifeellucky -t ./qsym/pintool/obj-intel64/libqsym.so -logfile test/out/pin.log -i test/1.txt -s 1 -d 1 -o test/out -- test/mywps
 
 third_party/pin-2.14-71313-gcc.4.4.7-linux/pin  -ifeellucky -t ./qsym/pintool/obj-intel64/libqsym.so -logfile test/out/pin.log -i test/1.txt -s 1 -d 1 -o test/out -- test/mywps
+
+third_party/pin-2.14-71313-gcc.4.4.7-linux/pin  -ifeellucky -t ./qsym/pintool/obj-intel64/libqsym.so -logfile test/two_read/out/pin.log -i test/1.txt -s 1 -d 1 -o test/two_read/out -- test/two_read/two_read
 ```
 
 ## 5.3 pinbin gdb

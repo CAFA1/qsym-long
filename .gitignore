@@ -14,6 +14,7 @@ pintool.log
 /.cache
 test/out/
 test/two_read/out/
+test/mywps1/out/
 # pytest
 .pytest_cache
 .gdb_history

@@ -521,6 +521,7 @@ void Solver::negatePath(ExprRef e, bool taken) {
   reset();
   syncConstraints(e);
   addToSolver(e, !taken);
+  LOG_INFO("negatePath");//liu debug
   bool sat = checkAndSave();
   if (!sat) {
     reset();

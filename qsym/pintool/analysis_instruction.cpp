@@ -1116,6 +1116,11 @@ void analyzeMovsx(INS ins) {
 }
 
 void analyzeMovzx(INS ins) {
+	//long debug
+	//std::stringstream stream;
+	//stream << std::hex << INS_Address(ins);
+	//std::string result( stream.str() );
+	//LOG_DEBUG("movz instruction "+result+": " + INS_Disassemble(ins) + "\n");
   analyzeBinary(ins, true,
       (AFUNPTR)instrumentMovzxRegReg,
       NULL,

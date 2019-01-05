@@ -1645,6 +1645,9 @@ third_party/pin-2.14-71313-gcc.4.4.7-linux/pin -pause_tool 20  -ifeellucky -t ./
 
 third_party/pin-2.14-71313-gcc.4.4.7-linux/pin  -ifeellucky -t ./qsym/pintool/obj-intel64/libqsym.so -logfile test/mywps1/out/pin.log -i test/1.txt -s 1 -d 1 -o test/mywps1/out -- test/mywps1/mywps1
 
+mywps_positon:
+third_party/pin-2.14-71313-gcc.4.4.7-linux/pin  -ifeellucky -t ./qsym/pintool/obj-intel64/libqsym.so -logfile test/mywps_position/out/pin.log -i test/1.txt -s 1 -d 1 -o test/mywps1/out -- test/mywps1/mywps1
+
 ```
 
 ## 5.3 pinbin gdb

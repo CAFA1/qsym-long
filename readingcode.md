@@ -33,7 +33,7 @@
     - [3.4. initializeQsym();初始化](#34-initializeqsym初始化)
         - [3.4.1. initializeThreadContext(); 线程初始化](#341-initializethreadcontext-线程初始化)
             - [3.4.1.1. PIN_AddThreadStartFunction(allocateThreadContext, NULL);线程进入](#3411-pin_addthreadstartfunctionallocatethreadcontext-null线程进入)
-            - [3.4.1.2. PIN_AddThreadFiniFunction(freeThreadContext,	NULL);线程退出](#3412-pin_addthreadfinifunctionfreethreadcontext	null线程退出)
+            - [3.4.1.2. PIN_AddThreadFiniFunction(freeThreadContext, NULL);线程退出](#3412-pin_addthreadfinifunctionfreethreadcontext	null线程退出)
         - [3.4.2. initializeMemory(); 内存初始化](#342-initializememory-内存初始化)
             - [3.4.2.1. g_memory.initialize(); 内存模型](#3421-g_memoryinitialize-内存模型)
             - [3.4.2.2. IMG_AddInstrumentFunction(loadImage, NULL);](#3422-img_addinstrumentfunctionloadimage-null)

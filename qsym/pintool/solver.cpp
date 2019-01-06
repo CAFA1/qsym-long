@@ -306,6 +306,8 @@ std::vector<UINT8> Solver::getConcreteValues() {
     if (name.kind() == Z3_INT_SYMBOL) {
       int value = e.get_numeral_int();
       values[name.to_int()] = (UINT8)value;
+      //long debug
+      printf("long debug: name = %d , value = %x\n",name.to_int(),value);
     }
   }
   return values;

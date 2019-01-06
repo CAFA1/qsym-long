@@ -20,3 +20,4 @@ test/mywps1/out/
 .gdb_history
 *.pyc
 *peda-session-pinbin.txt
+test/mywps_position/out/

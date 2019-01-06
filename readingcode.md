@@ -1,5 +1,7 @@
 
-<!-- TOC -->autoauto- [1. run_qsym_afl.py main](#1-run_qsym_aflpy-main)auto    - [1.0 parse_args() 解析命令 run_qsym.py](#10-parse_args-解析命令-run_qsympy)auto    - [1.1. AFLExecutor 构造](#11-aflexecutor-构造)auto    - [1.2 e.run 执行](#12-erun-执行)auto        - [1.2.1 sync_files 与fuzzer同步文件](#121-sync_files-与fuzzer同步文件)auto        - [1.2.2 run_file 测试样本](#122-run_file-测试样本)auto            - [1.2.2.1 check_so_file() 检查pintool so](#1221-check_so_file-检查pintool-so)auto            - [1.2.2.2 self.run_target()  运行](#1222-selfrun_target--运行)auto            - [1.2.2.3 self.handle_by_return_code(ret, fp) 处理返回码,分类保存测试样本](#1223-selfhandle_by_return_coderet-fp-处理返回码分类保存测试样本)auto            - [1.2.2.4 q.get_testcases(): 获取测试例](#1224-qget_testcases-获取测试例)auto            - [1.2.2.5 self.minimizer.check_testcase(testcase): 检查测试例](#1225-selfminimizercheck_testcasetestcase-检查测试例)auto                - [1.2.2.5.1 self.is_interesting_testcase(this_bitmap, proc.returncode)检查是否interesting](#12251-selfis_interesting_testcasethis_bitmap-procreturncode检查是否interesting)auto            - [1.2.2.6 self.check_crashes() 同步崩溃样本序号](#1226-selfcheck_crashes-同步崩溃样本序号)auto- [2. self.run_target()  运行 1.2.2.2](#2-selfrun_target--运行-1222)auto    - [2.1 executor.Executor(self.cmd, self.cur_input, self.tmp_dir, bitmap=self.bitmap, argv=["-l", "1"]) Executor构造](#21-executorexecutorselfcmd-selfcur_input-selftmp_dir-bitmapselfbitmap-argv-l-1-executor构造)auto    - [2.2 q.run(self.state.timeout) 运行](#22-qrunselfstatetimeout-运行)auto        - [2.2.1 self.gen_cmd(timeout) pin命令行](#221-selfgen_cmdtimeout-pin命令行)auto        - [2.2.2 ExecutorResult](#222-executorresult)auto- [3. pintool main](#3-pintool-main)auto    - [3.1 checkOpt())  参数](#31-checkopt--参数)auto    - [3.2 hookSyscalls 系统调用](#32-hooksyscalls-系统调用)auto        - [3.2.1 initializeSyscallDesc(); 初始化](#321-initializesyscalldesc-初始化)auto        - [3.2.2 kFdSet.insert(STDIN_FILENO);  hook stdin](#322-kfdsetinsertstdin_fileno--hook-stdin)auto        - [3.2.3 setSocketCallHook(); hook net](#323-setsocketcallhook-hook-net)auto        - [3.2.4 setMMapHookForFile();  hook fs](#324-setmmaphookforfile--hook-fs)auto    - [3.3 initializeGlobalContext(  建立上下文](#33-initializeglobalcontext--建立上下文)auto        - [3.3.1 g_solver = new Solver(input, out_dir, bitmap);  solver类](#331-g_solver--new-solverinput-out_dir-bitmap--solver类)auto            - [3.3.1.1 checkOutDir();  检查输出目录是否合法](#3311-checkoutdir--检查输出目录是否合法)auto            - [3.3.1.2 readInput();  读入输入](#3312-readinput--读入输入)auto        - [3.3.2 g_expr_builder = SymbolicExprBuilder::create();  符号执行表达式](#332-g_expr_builder--symbolicexprbuildercreate--符号执行表达式)auto            - [3.3.2.1 create ??](#3321-create-)auto    - [3.3 initializeQsym();初始化](#33-initializeqsym初始化)auto        - [3.3.1 initializeThreadContext(); 线程初始化](#331-initializethreadcontext-线程初始化)auto            - [3.3.1.1 PIN_AddThreadStartFunction(allocateThreadContext, NULL);线程进入](#3311-pin_addthreadstartfunctionallocatethreadcontext-null线程进入)auto            - [3.3.1.2 PIN_AddThreadFiniFunction(freeThreadContext,	NULL);线程退出](#3312-pin_addthreadfinifunctionfreethreadcontext	null线程退出)auto        - [3.3.2 initializeMemory(); 内存初始化](#332-initializememory-内存初始化)auto            - [3.3.2.1 g_memory.initialize(); 内存模型](#3321-g_memoryinitialize-内存模型)auto            - [3.3.2.2 IMG_AddInstrumentFunction(loadImage, NULL);](#3322-img_addinstrumentfunctionloadimage-null)auto        - [3.3.3 PIN_AddSyscallEntryFunction(onSyscallEnter, NULL); 系统调用进入](#333-pin_addsyscallentryfunctiononsyscallenter-null-系统调用进入)auto        - [3.3.4 PIN_AddSyscallExitFunction(onSyscallExit, NULL); 系统调用退出](#334-pin_addsyscallexitfunctiononsyscallexit-null-系统调用退出)auto        - [3.3.5 TRACE_AddInstrumentFunction(analyzeTrace, NULL); 基本块插桩](#335-trace_addinstrumentfunctionanalyzetrace-null-基本块插桩)auto            - [3.3.5.1 analyzeBBL(bbl); 基本块级分析](#3351-analyzebblbbl-基本块级分析)auto                - [3.3.5.1.1 instrumentBBL 分析代码](#33511-instrumentbbl-分析代码)auto            - [3.3.5.2 analyzeInstruction(ins); 指令级分析](#3352-analyzeinstructionins-指令级分析)auto                - [3.3.5.2.1 cmp  analyzeBinary(ins, Sub, false);](#33521-cmp--analyzebinaryins-sub-false)auto                    - [3.3.5.2.1.1 instrumentBinaryRegReg](#335211-instrumentbinaryregreg)auto                    - [3.3.5.2.1.2 ExprRef expr_res = doBinary(thread_ctx, kind, op_kind, expr_dst, expr_src); 运算](#335212-exprref-expr_res--dobinarythread_ctx-kind-op_kind-expr_dst-expr_src-运算)auto                    - [3.3.5.2.1.3 thread_ctx->setExprToReg(dst, expr_res); 赋值](#335213-thread_ctx-setexprtoregdst-expr_res-赋值)auto                - [3.3.5.2.2 jz analyzeJcc(ins, JCC_Z, false);](#33522-jz-analyzejccins-jcc_z-false)auto                - [3.3.5.2.3 mov](#33523-mov)auto        - [3.3.6 PIN_AddInternalExceptionHandler(exceptionHandler, NULL); 异常处理](#336-pin_addinternalexceptionhandlerexceptionhandler-null-异常处理)auto- [4. jz指令分析 analyzeJcc(ins, JCC_Z, false);](#4-jz指令分析-analyzejccins-jcc_z-false)auto    - [4.1 instrumentJcc](#41-instrumentjcc)auto        - [4.1.1 ExprRef e = thread_ctx->computeJcc(ctx, jcc_c, inv);计算jz表达式](#411-exprref-e--thread_ctx-computejccctx-jcc_c-inv计算jz表达式)auto            - [4.1.1.1 computeFastJcc](#4111-computefastjcc)auto            - [4.1.1.2 computeSlowJcc](#4112-computeslowjcc)auto                - [4.1.1.2.1 e = computeFlag(EFLAGS_ZF); jz](#41121-e--computeflageflags_zf-jz)auto                - [4.1.1.2.2 return flag_op->computeZF(); //liu](#41122-return-flag_op-computezf-liu)auto        - [4.1.2 g_solver->addJcc(e, taken, pc);  求解](#412-g_solver-addjcce-taken-pc--求解)auto            - [4.1.2.0 is_interesting = isInterestingJcc(e, taken, pc); //liu 是感兴趣的吗？](#4120-is_interesting--isinterestingjcce-taken-pc-liu-是感兴趣的吗)auto            - [4.1.2.1 negatePath(e, taken); //liu 翻转分支点](#4121-negatepathe-taken-liu-翻转分支点)auto                - [4.1.2.1.1 addToSolver(e, !taken);//liu](#41211-addtosolvere-takenliu)auto                - [4.1.2.1.2 bool sat = checkAndSave();//liu](#41212-bool-sat--checkandsaveliu)auto                    - [4.1.2.1.2.1 if (check() == z3::sat) {//liu](#412121-if-check--z3sat-liu)auto                    - [4.1.2.1.2.2 saveValues(postfix); //liu 保存求解值](#412122-savevaluespostfix-liu-保存求解值)auto                    - [4.1.2.1.2.3 std::vector<UINT8> values = getConcreteValues();//liu solve](#412123-stdvectoruint8-values--getconcretevaluesliu-solve)auto            - [4.1.2.2 addConstraint(e, taken, is_interesting); //liu 添加约束](#4122-addconstrainte-taken-is_interesting-liu-添加约束)auto- [5. pintool调试](#5-pintool调试)auto    - [5.1 run_qsym.py脚本](#51-run_qsympy脚本)auto    - [5.2 pin命令，5.1打印出的](#52-pin命令51打印出的)auto    - [5.3 pinbin gdb](#53-pinbin-gdb)auto    - [5.4 编译](#54-编译)auto- [6. z3 solver的例子](#6-z3-solver的例子)auto    - [6.1 github sample](#61-github-sample)auto- [7. read 污点引入](#7-read-污点引入)auto    - [7.1 g_memory.makeExpr(ctx->arg[SYSCALL_ARG1], ctx->ret);//liu 符号化](#71-g_memorymakeexprctx-argsyscall_arg1-ctx-retliu-符号化)auto        - [7.1.0 LOG_DEBUG](#710-log_debug)auto        - [7.1.1 ExprRef e = g_expr_builder->createRead(off_++); //liu 建立符号名称](#711-exprref-e--g_expr_builder-createreadoff_-liu-建立符号名称)auto        - [7.1.2 setExprToMem(addr, e);//liu 存入内存](#712-setexprtomemaddr-eliu-存入内存)auto            - [7.1.2.1 clearExprFromMem(addr);//liu 清除](#7121-clearexprfrommemaddrliu-清除)auto            - [7.1.2.2 *getExprPtrFromMem(addr) = e;//liu 赋值](#7122-getexprptrfrommemaddr--eliu-赋值)auto                - [7.1.2.2.1 ExprRef* page = getPage(addr); //liu 找到页面](#71221-exprref-page--getpageaddr-liu-找到页面)auto                - [7.1.2.2.2 return &page[addressToOffset(addr)]; //liu 找到页面里偏移](#71222-return-pageaddresstooffsetaddr-liu-找到页面里偏移)auto    - [7.2 从求解反推](#72-从求解反推)auto        - [7.2.1 getConcreteValues](#721-getconcretevalues)auto        - [7.2.2 readInput初始化](#722-readinput初始化)auto        - [7.2.3 solver类构造函数](#723-solver类构造函数)auto        - [7.2.4 初始化input_file](#724-初始化input_file)auto        - [7.2.5 在pintool 的main函数中初始化](#725-在pintool-的main函数中初始化)autoauto<!-- /TOC -->
+<!-- TOC -->autoauto- [1. run_qsym_afl.py main](#1-run_qsym_aflpy-main)auto    - [1.1. parse_args() 解析命令 run_qsym.py](#11-parse_args-解析命令-run_qsympy)auto    - [1.2. AFLExecutor 构造](#12-aflexecutor-构造)auto    - [1.3. e.run 执行](#13-erun-执行)auto        - [1.3.1. sync_files 与fuzzer同步文件](#131-sync_files-与fuzzer同步文件)auto        - [1.3.2. run_file 测试样本](#132-run_file-测试样本)auto            - [1.3.2.1. check_so_file() 检查pintool so](#1321-check_so_file-检查pintool-so)auto            - [1.3.2.2. self.run_target()  运行](#1322-selfrun_target--运行)auto            - [1.3.2.3. self.handle_by_return_code(ret, fp) 处理返回码,分类保存测试样本](#1323-selfhandle_by_return_coderet-fp-处理返回码分类保存测试样本)auto            - [1.3.2.4. q.get_testcases(): 获取测试例](#1324-qget_testcases-获取测试例)auto            - [1.3.2.5. self.minimizer.check_testcase(testcase): 检查测试例](#1325-selfminimizercheck_testcasetestcase-检查测试例)auto                - [1.3.2.5.1. self.is_interesting_testcase(this_bitmap, proc.returncode)检查是否interesting](#13251-selfis_interesting_testcasethis_bitmap-procreturncode检查是否interesting)auto            - [1.3.2.6. self.check_crashes() 同步崩溃样本序号](#1326-selfcheck_crashes-同步崩溃样本序号)auto- [2. self.run_target()  运行 1.2.2.2](#2-selfrun_target--运行-1222)auto    - [2.1. executor.Executor(self.cmd, self.cur_input, self.tmp_dir, bitmap=self.bitmap, argv=["-l", "1"]) Executor构造](#21-executorexecutorselfcmd-selfcur_input-selftmp_dir-bitmapselfbitmap-argv-l-1-executor构造)auto    - [2.2. q.run(self.state.timeout) 运行](#22-qrunselfstatetimeout-运行)auto        - [2.2.1. self.gen_cmd(timeout) pin命令行](#221-selfgen_cmdtimeout-pin命令行)auto        - [2.2.2. ExecutorResult](#222-executorresult)auto- [3. pintool main](#3-pintool-main)auto    - [3.1. checkOpt())  参数](#31-checkopt--参数)auto    - [3.2. hookSyscalls 系统调用](#32-hooksyscalls-系统调用)auto        - [3.2.1. initializeSyscallDesc(); 初始化](#321-initializesyscalldesc-初始化)auto        - [3.2.2. kFdSet.insert(STDIN_FILENO);  hook stdin](#322-kfdsetinsertstdin_fileno--hook-stdin)auto        - [3.2.3. setSocketCallHook(); hook net](#323-setsocketcallhook-hook-net)auto        - [3.2.4. setMMapHookForFile();  hook fs](#324-setmmaphookforfile--hook-fs)auto    - [3.3. initializeGlobalContext(  建立上下文](#33-initializeglobalcontext--建立上下文)auto        - [3.3.1. g_solver = new Solver(input, out_dir, bitmap);  solver类](#331-g_solver--new-solverinput-out_dir-bitmap--solver类)auto            - [3.3.1.1. checkOutDir();  检查输出目录是否合法](#3311-checkoutdir--检查输出目录是否合法)auto            - [3.3.1.2. readInput();  读入输入](#3312-readinput--读入输入)auto        - [3.3.2. g_expr_builder = SymbolicExprBuilder::create();  符号执行表达式](#332-g_expr_builder--symbolicexprbuildercreate--符号执行表达式)auto            - [3.3.2.1. create ??](#3321-create-)auto    - [3.4. initializeQsym();初始化](#34-initializeqsym初始化)auto        - [3.4.1. initializeThreadContext(); 线程初始化](#341-initializethreadcontext-线程初始化)auto            - [3.4.1.1. PIN_AddThreadStartFunction(allocateThreadContext, NULL);线程进入](#3411-pin_addthreadstartfunctionallocatethreadcontext-null线程进入)auto            - [3.4.1.2. PIN_AddThreadFiniFunction(freeThreadContext,	NULL);线程退出](#3412-pin_addthreadfinifunctionfreethreadcontext	null线程退出)auto        - [3.4.2. initializeMemory(); 内存初始化](#342-initializememory-内存初始化)auto            - [3.4.2.1. g_memory.initialize(); 内存模型](#3421-g_memoryinitialize-内存模型)auto            - [3.4.2.2. IMG_AddInstrumentFunction(loadImage, NULL);](#3422-img_addinstrumentfunctionloadimage-null)auto        - [3.4.3. PIN_AddSyscallEntryFunction(onSyscallEnter, NULL); 系统调用进入](#343-pin_addsyscallentryfunctiononsyscallenter-null-系统调用进入)auto        - [3.4.4. PIN_AddSyscallExitFunction(onSyscallExit, NULL); 系统调用退出](#344-pin_addsyscallexitfunctiononsyscallexit-null-系统调用退出)auto        - [3.4.5. TRACE_AddInstrumentFunction(analyzeTrace, NULL); 基本块插桩](#345-trace_addinstrumentfunctionanalyzetrace-null-基本块插桩)auto            - [3.4.5.1. analyzeBBL(bbl); 基本块级分析](#3451-analyzebblbbl-基本块级分析)auto                - [3.4.5.1.1. instrumentBBL 分析代码](#34511-instrumentbbl-分析代码)auto            - [3.4.5.2. analyzeInstruction(ins); 指令级分析](#3452-analyzeinstructionins-指令级分析)auto                - [3.4.5.2.1. cmp  analyzeBinary(ins, Sub, false);](#34521-cmp--analyzebinaryins-sub-false)auto                    - [3.4.5.2.1.1. instrumentBinaryRegReg](#345211-instrumentbinaryregreg)auto                    - [3.4.5.2.1.2. ExprRef expr_res = doBinary(thread_ctx, kind, op_kind, expr_dst, expr_src); 运算](#345212-exprref-expr_res--dobinarythread_ctx-kind-op_kind-expr_dst-expr_src-运算)auto                    - [3.4.5.2.1.3. thread_ctx->setExprToReg(dst, expr_res); 赋值](#345213-thread_ctx-setexprtoregdst-expr_res-赋值)auto                - [3.4.5.2.2. jz analyzeJcc(ins, JCC_Z, false);](#34522-jz-analyzejccins-jcc_z-false)auto                - [3.4.5.2.3. mov](#34523-mov)auto        - [3.4.6. PIN_AddInternalExceptionHandler(exceptionHandler, NULL); 异常处理](#346-pin_addinternalexceptionhandlerexceptionhandler-null-异常处理)auto- [4. jz指令分析 analyzeJcc(ins, JCC_Z, false);](#4-jz指令分析-analyzejccins-jcc_z-false)auto    - [4.1. instrumentJcc](#41-instrumentjcc)auto        - [4.1.1. ExprRef e = thread_ctx->computeJcc(ctx, jcc_c, inv);计算jz表达式](#411-exprref-e--thread_ctx-computejccctx-jcc_c-inv计算jz表达式)auto            - [4.1.1.1. computeFastJcc](#4111-computefastjcc)auto            - [4.1.1.2. computeSlowJcc](#4112-computeslowjcc)auto                - [4.1.1.2.1. e = computeFlag(EFLAGS_ZF); jz](#41121-e--computeflageflags_zf-jz)auto                - [4.1.1.2.2. return flag_op->computeZF(); //liu](#41122-return-flag_op-computezf-liu)auto        - [4.1.2. g_solver->addJcc(e, taken, pc);  求解](#412-g_solver-addjcce-taken-pc--求解)auto            - [4.1.2.1. is_interesting = isInterestingJcc(e, taken, pc); //liu 是感兴趣的吗？](#4121-is_interesting--isinterestingjcce-taken-pc-liu-是感兴趣的吗)auto            - [4.1.2.2. negatePath(e, taken); //liu 翻转分支点](#4122-negatepathe-taken-liu-翻转分支点)auto                - [4.1.2.2.1. addToSolver(e, !taken);//liu](#41221-addtosolvere-takenliu)auto                - [4.1.2.2.2. bool sat = checkAndSave();//liu](#41222-bool-sat--checkandsaveliu)auto                    - [4.1.2.2.2.1. if (check() == z3::sat) {//liu](#412221-if-check--z3sat-liu)auto                    - [4.1.2.2.2.2. saveValues(postfix); //liu 保存求解值](#412222-savevaluespostfix-liu-保存求解值)auto                    - [4.1.2.2.2.3. std::vector<UINT8> values = getConcreteValues();//liu solve](#412223-stdvectoruint8-values--getconcretevaluesliu-solve)auto            - [4.1.2.3. addConstraint(e, taken, is_interesting); //liu 添加约束](#4123-addconstrainte-taken-is_interesting-liu-添加约束)auto- [5. pintool调试](#5-pintool调试)auto    - [5.1. run_qsym.py脚本](#51-run_qsympy脚本)auto    - [5.2. pin命令，5.1打印出的](#52-pin命令51打印出的)auto    - [5.3. pinbin gdb](#53-pinbin-gdb)auto    - [5.4. 编译](#54-编译)auto- [6. z3 solver的例子](#6-z3-solver的例子)auto    - [6.1. github sample](#61-github-sample)auto- [7. read 污点引入](#7-read-污点引入)auto    - [7.1. g_memory.makeExpr(ctx->arg[SYSCALL_ARG1], ctx->ret);//liu 符号化](#71-g_memorymakeexprctx-argsyscall_arg1-ctx-retliu-符号化)auto        - [7.1.1. LOG_DEBUG](#711-log_debug)auto        - [7.1.2. ExprRef e = g_expr_builder->createRead(off_++); //liu 建立符号名称](#712-exprref-e--g_expr_builder-createreadoff_-liu-建立符号名称)auto        - [7.1.3. setExprToMem(addr, e);//liu 存入内存](#713-setexprtomemaddr-eliu-存入内存)auto            - [7.1.3.1. clearExprFromMem(addr);//liu 清除](#7131-clearexprfrommemaddrliu-清除)auto            - [7.1.3.2. *getExprPtrFromMem(addr) = e;//liu 赋值](#7132-getexprptrfrommemaddr--eliu-赋值)auto                - [7.1.3.2.1. ExprRef* page = getPage(addr); //liu 找到页面](#71321-exprref-page--getpageaddr-liu-找到页面)auto                - [7.1.3.2.2. return &page[addressToOffset(addr)]; //liu 找到页面里偏移](#71322-return-pageaddresstooffsetaddr-liu-找到页面里偏移)auto    - [7.2. 从求解反推](#72-从求解反推)auto        - [7.2.1. getConcreteValues](#721-getconcretevalues)auto        - [7.2.2. readInput初始化](#722-readinput初始化)auto        - [7.2.3. solver类构造函数](#723-solver类构造函数)auto        - [7.2.4. 初始化input_file](#724-初始化input_file)auto        - [7.2.5. 在pintool 的main函数中初始化](#725-在pintool-的main函数中初始化)autoauto<!-- /TOC -->
+
+
 # 1. run_qsym_afl.py main
 ```python
 def main():
@@ -13,7 +15,7 @@ def main():
     finally:
         e.cleanup()
 ```
-## 1.0 parse_args() 解析命令 run_qsym.py
+## 1.1. parse_args() 解析命令 run_qsym.py
 ```python
 def parse_args():
     p = argparse.ArgumentParser()
@@ -61,7 +63,7 @@ def fix_at_file(cmd, testcase):
 
     return cmd, stdin
 ```
-## 1.1. AFLExecutor 构造
+## 1.2. AFLExecutor 构造
 ```python
 class AFLExecutor(object):
     def __init__(self, cmd, output, afl, name, filename=None, mail=None, asan_bin=None):
@@ -81,7 +83,7 @@ class AFLExecutor(object):
         self.make_dirs()
         atexit.register(self.cleanup)
 ```
-## 1.2 e.run 执行
+## 1.3. e.run 执行
 ```python
     def run(self):
         logger.debug("Temp directory=%s" % self.tmp_dir)
@@ -97,7 +99,7 @@ class AFLExecutor(object):
                 self.run_file(fp)
                 break
 ```
-### 1.2.1 sync_files 与fuzzer同步文件
+### 1.3.1. sync_files 与fuzzer同步文件
 ```python
     def sync_files(self):
         files = []
@@ -111,7 +113,7 @@ class AFLExecutor(object):
                       key=functools.cmp_to_key(testcase_compare),
                       reverse=True)
 ```
-### 1.2.2 run_file 测试样本
+### 1.3.2. run_file 测试样本
 ```python
     def run_file(self, fp):
         check_so_file() #liu 检查pintool so
@@ -151,7 +153,7 @@ class AFLExecutor(object):
 
 ```
 
-#### 1.2.2.1 check_so_file() 检查pintool so
+#### 1.3.2.1. check_so_file() 检查pintool so
 ```python
 def check_so_file():
     for SO_file in SO.values():
@@ -164,7 +166,7 @@ def check_so_file():
             FATAL("Cannot find SO file!")
 ```
 
-#### 1.2.2.2 self.run_target()  运行
+#### 1.3.2.2. self.run_target()  运行
 ```python
     def run_target(self):
         # Trigger linearlize to remove complicate expressions
@@ -178,7 +180,7 @@ def check_so_file():
         return q, ret
 ```
 
-#### 1.2.2.3 self.handle_by_return_code(ret, fp) 处理返回码,分类保存测试样本
+#### 1.3.2.3. self.handle_by_return_code(ret, fp) 处理返回码,分类保存测试样本
 ```python
     def handle_by_return_code(self, res, fp):
         retcode = res.returncode
@@ -200,7 +202,7 @@ def check_so_file():
             self.report_error(fp, res.log)
 ```
 
-#### 1.2.2.4 q.get_testcases(): 获取测试例
+#### 1.3.2.4. q.get_testcases(): 获取测试例
 ```python
     def get_testcases(self):
         for name in sorted(os.listdir(self.testcase_dir)): #liu 求解新样本目录
@@ -217,7 +219,7 @@ def check_so_file():
             path = os.path.join(self.testcase_dir, name)
             yield path
 ```
-#### 1.2.2.5 self.minimizer.check_testcase(testcase): 检查测试例
+#### 1.3.2.5. self.minimizer.check_testcase(testcase): 检查测试例
 ```python
     def check_testcase(self, testcase):
         cmd = [self.showmap,
@@ -243,7 +245,7 @@ def check_so_file():
         this_bitmap = read_bitmap_file(self.temp_file)
         return self.is_interesting_testcase(this_bitmap, proc.returncode) #liu 检查是否interesting
 ```
-##### 1.2.2.5.1 self.is_interesting_testcase(this_bitmap, proc.returncode)检查是否interesting
+##### 1.3.2.5.1. self.is_interesting_testcase(this_bitmap, proc.returncode)检查是否interesting
 ```python
     def is_interesting_testcase(self, bitmap, returncode):
         if returncode == 0:
@@ -266,7 +268,7 @@ def check_so_file():
             write_bitmap_file(my_bitmap_file, my_bitmap)
         return interesting
 ```
-#### 1.2.2.6 self.check_crashes() 同步崩溃样本序号
+#### 1.3.2.6. self.check_crashes() 同步崩溃样本序号
 ```python
     def check_crashes(self):
         for fuzzer in os.listdir(self.output):
@@ -302,7 +304,7 @@ def check_so_file():
                         ret.returncode))
         return q, ret
 ```
-## 2.1 executor.Executor(self.cmd, self.cur_input, self.tmp_dir, bitmap=self.bitmap, argv=["-l", "1"]) Executor构造
+## 2.1. executor.Executor(self.cmd, self.cur_input, self.tmp_dir, bitmap=self.bitmap, argv=["-l", "1"]) Executor构造
 ```python
 class Executor(object):
     def __init__(self, cmd, input_file, output_dir,
@@ -317,7 +319,7 @@ class Executor(object):
         self.set_opts()
 ```
 
-## 2.2 q.run(self.state.timeout) 运行
+## 2.2. q.run(self.state.timeout) 运行
 ```python
     def run(self, timeout=None):
         cmd = self.gen_cmd(timeout) #liu 命令行
@@ -335,7 +337,7 @@ class Executor(object):
                 self.read_log_file())
 ```
 
-### 2.2.1 self.gen_cmd(timeout) pin命令行
+### 2.2.1. self.gen_cmd(timeout) pin命令行
 ```python
     def gen_cmd(self, timeout):
         cmd = []
@@ -363,7 +365,7 @@ class Executor(object):
         return cmd + ["--"] + self.cmd
 ```
 
-### 2.2.2 ExecutorResult
+### 2.2.2. ExecutorResult
 ```python
 class ExecutorResult(object):
     def __init__(self, start_time, end_time, returncode, log):
@@ -402,7 +404,7 @@ err:
   return kExitFailure;
 }
 ```
-## 3.1 checkOpt())  参数
+## 3.1. checkOpt())  参数
 ```c
 bool checkOpt() {
   bool b1 = g_opt_stdin.Value() != 0;
@@ -437,7 +439,7 @@ multiple_opt:
 ```
 
 
-## 3.2 hookSyscalls 系统调用
+## 3.2. hookSyscalls 系统调用
 ```c
 void hookSyscalls(bool hook_stdin, bool hook_fs, bool hook_net,
                   const std::string& input) {
@@ -463,7 +465,7 @@ void hookSyscalls(bool hook_stdin, bool hook_fs, bool hook_net,
   setDupHook();
 }
 ```
-### 3.2.1 initializeSyscallDesc(); 初始化
+### 3.2.1. initializeSyscallDesc(); 初始化
 
 ```C
 void
@@ -495,7 +497,7 @@ initializeSyscallDesc() {
   */
 ```
 
-### 3.2.2 kFdSet.insert(STDIN_FILENO);  hook stdin
+### 3.2.2. kFdSet.insert(STDIN_FILENO);  hook stdin
 
 ```c
 namespace qsym {
@@ -507,19 +509,19 @@ extern SyscallDesc  kSyscallDesc[kSyscallMax];
 extern Memory g_memory;
 ```
 
-### 3.2.3 setSocketCallHook(); hook net
+### 3.2.3. setSocketCallHook(); hook net
 
 ```c
 
 ```
 
-### 3.2.4 setMMapHookForFile();  hook fs
+### 3.2.4. setMMapHookForFile();  hook fs
 
 ```c
 
 ```
 
-## 3.3 initializeGlobalContext(  建立上下文
+## 3.3. initializeGlobalContext(  建立上下文
 ```c
 void initializeGlobalContext(
     const std::string input,
@@ -533,7 +535,7 @@ void initializeGlobalContext(
     g_expr_builder = SymbolicExprBuilder::create(); //liu 符号执行表达式
 }
 ```
-### 3.3.1 g_solver = new Solver(input, out_dir, bitmap);  solver类
+### 3.3.1. g_solver = new Solver(input, out_dir, bitmap);  solver类
 ```C
 Solver::Solver(
     const std::string input_file,
@@ -563,7 +565,7 @@ Solver::Solver(
 }
 ```
 
-#### 3.3.1.1 checkOutDir();  检查输出目录是否合法
+#### 3.3.1.1. checkOutDir();  检查输出目录是否合法
 ```C
 void Solver::checkOutDir() {
   // skip if there is no out_dir
@@ -581,7 +583,7 @@ void Solver::checkOutDir() {
 }
 ```
 
-#### 3.3.1.2 readInput();  读入输入
+#### 3.3.1.2. readInput();  读入输入
 ```C
 void Solver::readInput() {
   std::ifstream ifs (input_file_, std::ifstream::in | std::ifstream::binary); //liu 读输入文件
@@ -603,7 +605,7 @@ void Solver::readInput() {
 
 
 
-### 3.3.2 g_expr_builder = SymbolicExprBuilder::create();  符号执行表达式
+### 3.3.2. g_expr_builder = SymbolicExprBuilder::create();  符号执行表达式
 ```C
 class SymbolicExprBuilder : public ExprBuilder {
 public:
@@ -648,7 +650,7 @@ private:
   };
 
 ```
-#### 3.3.2.1 create ??
+#### 3.3.2.1. create ??
 ```C
 ExprBuilder* SymbolicExprBuilder::create() {
   ExprBuilder* base = new BaseExprBuilder();
@@ -668,7 +670,7 @@ ExprBuilder* SymbolicExprBuilder::create() {
 }
 ```
 
-## 3.3 initializeQsym();初始化
+## 3.4. initializeQsym();初始化
 
 ```c
 void initializeQsym() {
@@ -682,7 +684,7 @@ void initializeQsym() {
 }
 ```
 
-### 3.3.1 initializeThreadContext(); 线程初始化
+### 3.4.1. initializeThreadContext(); 线程初始化
 ```C
 static inline void
 initializeThreadContext() {
@@ -694,7 +696,7 @@ initializeThreadContext() {
 }
 ```
 
-#### 3.3.1.1 PIN_AddThreadStartFunction(allocateThreadContext, NULL);线程进入
+#### 3.4.1.1. PIN_AddThreadStartFunction(allocateThreadContext, NULL);线程进入
 ```C
 static inline void
 allocateThreadContext(THREADID tid, CONTEXT* ctx, INT32 flags, VOID* v) {
@@ -704,7 +706,7 @@ allocateThreadContext(THREADID tid, CONTEXT* ctx, INT32 flags, VOID* v) {
 }
 ```
 
-#### 3.3.1.2 PIN_AddThreadFiniFunction(freeThreadContext,	NULL);线程退出
+#### 3.4.1.2. PIN_AddThreadFiniFunction(freeThreadContext,	NULL);线程退出
 ```C
 static inline void
 freeThreadContext(THREADID tid, const CONTEXT* ctx, INT32 code, VOID* v) {
@@ -714,7 +716,7 @@ freeThreadContext(THREADID tid, const CONTEXT* ctx, INT32 code, VOID* v) {
 }
 ```
 
-### 3.3.2 initializeMemory(); 内存初始化
+### 3.4.2. initializeMemory(); 内存初始化
 ```C
 static inline void
 initializeMemory() {
@@ -722,7 +724,7 @@ initializeMemory() {
 	IMG_AddInstrumentFunction(loadImage, NULL);
 }
 ```
-#### 3.3.2.1 g_memory.initialize(); 内存模型
+#### 3.4.2.1. g_memory.initialize(); 内存模型
 ```C
  void Memory::initialize()
 {
@@ -737,7 +739,7 @@ initializeMemory() {
 }
 ```
 
-#### 3.3.2.2 IMG_AddInstrumentFunction(loadImage, NULL);
+#### 3.4.2.2. IMG_AddInstrumentFunction(loadImage, NULL);
 ```C
  static void
 loadImage(IMG img, VOID* v) {
@@ -754,7 +756,7 @@ loadImage(IMG img, VOID* v) {
 }
 ```
 
-### 3.3.3 PIN_AddSyscallEntryFunction(onSyscallEnter, NULL); 系统调用进入
+### 3.4.3. PIN_AddSyscallEntryFunction(onSyscallEnter, NULL); 系统调用进入
 ```C
 static void
 onSyscallEnter(THREADID tid, CONTEXT* ctx, SYSCALL_STANDARD std, VOID* v) {
@@ -764,7 +766,7 @@ onSyscallEnter(THREADID tid, CONTEXT* ctx, SYSCALL_STANDARD std, VOID* v) {
 }
 ```
 
-### 3.3.4 PIN_AddSyscallExitFunction(onSyscallExit, NULL); 系统调用退出
+### 3.4.4. PIN_AddSyscallExitFunction(onSyscallExit, NULL); 系统调用退出
 ```C
 static void
 onSyscallExit(THREADID tid, CONTEXT* ctx, SYSCALL_STANDARD std, VOID* v) {
@@ -775,7 +777,7 @@ onSyscallExit(THREADID tid, CONTEXT* ctx, SYSCALL_STANDARD std, VOID* v) {
 }
 ```
 
-### 3.3.5 TRACE_AddInstrumentFunction(analyzeTrace, NULL); 基本块插桩
+### 3.4.5. TRACE_AddInstrumentFunction(analyzeTrace, NULL); 基本块插桩
 ```C
 void
 analyzeTrace(TRACE trace, VOID *v)
@@ -791,7 +793,7 @@ analyzeTrace(TRACE trace, VOID *v)
 }
 ```
 
-#### 3.3.5.1 analyzeBBL(bbl); 基本块级分析
+#### 3.4.5.1. analyzeBBL(bbl); 基本块级分析
 ```C
 void
 analyzeBBL(BBL bbl) {
@@ -802,7 +804,7 @@ analyzeBBL(BBL bbl) {
       IARG_END);
 }
 ```
-##### 3.3.5.1.1 instrumentBBL 分析代码
+##### 3.4.5.1.1. instrumentBBL 分析代码
 ```C
 void instrumentBBL(
     ThreadContext *thread_ctx,
@@ -816,7 +818,7 @@ void CallStackManager::visitBasicBlock(ADDRINT pc) {
   }
 ```
 
-#### 3.3.5.2 analyzeInstruction(ins); 指令级分析
+#### 3.4.5.2. analyzeInstruction(ins); 指令级分析
 ```C
 void
 analyzeInstruction(INS ins) {
@@ -859,7 +861,7 @@ analyzeInstruction(INS ins) {
   
 ```
 
-##### 3.3.5.2.1 cmp  analyzeBinary(ins, Sub, false); 
+##### 3.4.5.2.1. cmp  analyzeBinary(ins, Sub, false); 
 ```C
 void
 analyzeBinary(INS ins, Kind kind, bool write) {
@@ -971,7 +973,7 @@ analyzeBinary(
     UNREACHABLE();
 }
 ```
-###### 3.3.5.2.1.1 instrumentBinaryRegReg
+###### 3.4.5.2.1.1. instrumentBinaryRegReg
 ```C
 void PIN_FAST_ANALYSIS_CALL
 instrumentBinaryRegReg(
@@ -1001,7 +1003,7 @@ instrumentBinaryRegReg(
     thread_ctx->setExprToReg(dst, expr_res); //liu 如果写的话，赋值到寄存器
 }
 ```
-###### 3.3.5.2.1.2 ExprRef expr_res = doBinary(thread_ctx, kind, op_kind, expr_dst, expr_src); 运算
+###### 3.4.5.2.1.2. ExprRef expr_res = doBinary(thread_ctx, kind, op_kind, expr_dst, expr_src); 运算
 ```C
 static ExprRef
 doBinary(
@@ -1015,7 +1017,7 @@ doBinary(
   return expr_res;
 }
 ```
-###### 3.3.5.2.1.3 thread_ctx->setExprToReg(dst, expr_res); 赋值
+###### 3.4.5.2.1.3. thread_ctx->setExprToReg(dst, expr_res); 赋值
 ```C
 inline void setExprToReg(REG r, ExprRef e) {
       setExprToReg(r, e, 0, REG_Size(r));
@@ -1091,7 +1093,7 @@ inline void setExprToReg(REG r, ExprRef e) {
 ```
 
 
-##### 3.3.5.2.2 jz analyzeJcc(ins, JCC_Z, false);
+##### 3.4.5.2.2. jz analyzeJcc(ins, JCC_Z, false);
 ```C
 void
 analyzeJcc(INS ins, JccKind jcc_kind, bool inv) {
@@ -1108,14 +1110,14 @@ analyzeJcc(INS ins, JccKind jcc_kind, bool inv) {
 }
 ```
 
-##### 3.3.5.2.3 mov
+##### 3.4.5.2.3. mov
 ```C
 
 ```
 
 
 
-### 3.3.6 PIN_AddInternalExceptionHandler(exceptionHandler, NULL); 异常处理
+### 3.4.6. PIN_AddInternalExceptionHandler(exceptionHandler, NULL); 异常处理
 ```C
 static EXCEPT_HANDLING_RESULT
 exceptionHandler(THREADID tid, EXCEPTION_INFO *pExceptInfo,
@@ -1165,7 +1167,7 @@ analyzeJcc(INS ins, JccKind jcc_kind, bool inv) {
       IARG_END);
 }
 ```
-## 4.1 instrumentJcc
+## 4.1. instrumentJcc
 ```C
 analyzeJcc(ins, JCC_Z, false);
 void
@@ -1199,7 +1201,7 @@ instrumentJcc(ThreadContext* thread_ctx,
 }
 ```
 
-### 4.1.1 ExprRef e = thread_ctx->computeJcc(ctx, jcc_c, inv);计算jz表达式
+### 4.1.1. ExprRef e = thread_ctx->computeJcc(ctx, jcc_c, inv);计算jz表达式
 ```C
 inline ExprRef computeJcc(const CONTEXT* ctx, JccKind jcc_c, bool inv) {
       return eflags_.computeJcc(ctx, jcc_c, inv);
@@ -1219,7 +1221,7 @@ ExprRef Eflags::computeJcc(const CONTEXT* ctx, JccKind jcc_c, bool inv) {
   return e;
 }
 ```
-####4.1.1.1 computeFastJcc
+#### 4.1.1.1. computeFastJcc
 ```C
 ExprRef Eflags::computeFastJcc(const CONTEXT* ctx,
     JccKind jcc_c, bool inv) {
@@ -1283,7 +1285,7 @@ fast_jcc_s:
     return g_expr_builder->createBinaryExpr(op, flag_op->expr_result(), expr_zero);
 }
 ```
-####4.1.1.2 computeSlowJcc
+#### 4.1.1.2. computeSlowJcc
 ```C
 ExprRef Eflags::computeSlowJcc(const CONTEXT* ctx, JccKind jcc_c, bool inv) {
   ExprRef e = NULL;
@@ -1326,7 +1328,7 @@ ExprRef Eflags::computeSlowJcc(const CONTEXT* ctx, JccKind jcc_c, bool inv) {
   return e;
 }
 ```
-##### 4.1.1.2.1 e = computeFlag(EFLAGS_ZF); jz
+##### 4.1.1.2.1. e = computeFlag(EFLAGS_ZF); jz
 ```C
 ExprRef Eflags::computeFlag(Eflag flag) {
   for (INT i = 0; i < CC_OP_LAST; i++) {
@@ -1380,14 +1382,14 @@ ExprRef Eflags::computeFlag(Eflag flag) {
   return NULL;
 }
 ```
-##### 4.1.1.2.2 return flag_op->computeZF(); //liu
+##### 4.1.1.2.2. return flag_op->computeZF(); //liu
 ```c
 ExprRef FlagOperation::computeZF() {
   ExprRef zero = g_expr_builder->createConstant(0, expr_result_->bits());
   return g_expr_builder->createBinaryExpr(Equal, expr_result_, zero);
 }
 ```
-### 4.1.2 g_solver->addJcc(e, taken, pc);  求解
+### 4.1.2. g_solver->addJcc(e, taken, pc);  求解
 ```C
 void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc) {
   // Save the last instruction pointer for debugging
@@ -1419,7 +1421,7 @@ void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc) {
   addConstraint(e, taken, is_interesting); //liu 添加约束
 }
 ```
-#### 4.1.2.0 is_interesting = isInterestingJcc(e, taken, pc); //liu 是感兴趣的吗？
+#### 4.1.2.1. is_interesting = isInterestingJcc(e, taken, pc); //liu 是感兴趣的吗？
 ```c
 bool Solver::isInterestingJcc(ExprRef rel_expr, bool taken, ADDRINT pc) {
   bool interesting = trace_.isInterestingBranch(pc, taken); //liu 
@@ -1462,7 +1464,7 @@ bool AflTraceMap::isInterestingBranch(ADDRINT pc, bool taken) {
   return ret;
 }
 ```
-#### 4.1.2.1 negatePath(e, taken); //liu 翻转分支点
+#### 4.1.2.2. negatePath(e, taken); //liu 翻转分支点
 ```C
 void Solver::negatePath(ExprRef e, bool taken) {
   reset();
@@ -1477,7 +1479,7 @@ void Solver::negatePath(ExprRef e, bool taken) {
   }
 }
 ```
-##### 4.1.2.1.1 addToSolver(e, !taken);//liu 
+##### 4.1.2.2.1. addToSolver(e, !taken);//liu 
 ```C
 void Solver::addToSolver(ExprRef e, bool taken) {
   e->simplify();
@@ -1494,7 +1496,7 @@ ExprRef ConstantFoldingExprBuilder::createLNot(ExprRef e) {
 }
 
 ```
-##### 4.1.2.1.2 bool sat = checkAndSave();//liu
+##### 4.1.2.2.2. bool sat = checkAndSave();//liu
 ```C
 bool Solver::checkAndSave(const std::string& postfix) {
   if (check() == z3::sat) {//liu 检查是否可解
@@ -1586,7 +1588,7 @@ bool Solver::checkAndSave(const std::string& postfix) {
 */
 
 ```
-###### 4.1.2.1.2.1 if (check() == z3::sat) {//liu 
+###### 4.1.2.2.2.1. if (check() == z3::sat) {//liu 
 ```C
 z3::check_result Solver::check() {
   uint64_t before = getTimeStamp();
@@ -1610,7 +1612,7 @@ z3::check_result Solver::check() {
   return res;
 }
 ```
-###### 4.1.2.1.2.2 saveValues(postfix); //liu 保存求解值
+###### 4.1.2.2.2.2. saveValues(postfix); //liu 保存求解值
 ```C
 void Solver::saveValues(const std::string& postfix) {
   std::vector<UINT8> values = getConcreteValues();//liu solve
@@ -1640,7 +1642,7 @@ void Solver::saveValues(const std::string& postfix) {
   num_generated_++;
 }
 ```
-###### 4.1.2.1.2.3 std::vector<UINT8> values = getConcreteValues();//liu solve
+###### 4.1.2.2.2.3. std::vector<UINT8> values = getConcreteValues();//liu solve
 ```C
 std::vector<UINT8> Solver::getConcreteValues() {
   // TODO: change from real input
@@ -1661,7 +1663,7 @@ std::vector<UINT8> Solver::getConcreteValues() {
 }
 ```
 
-#### 4.1.2.2 addConstraint(e, taken, is_interesting); //liu 添加约束
+#### 4.1.2.3. addConstraint(e, taken, is_interesting); //liu 添加约束
 ```C
 void Solver::addConstraint(ExprRef e, bool taken, bool is_interesting) {
   if (auto NE = castAs<LNotExpr>(e)) {
@@ -1675,13 +1677,13 @@ void Solver::addConstraint(ExprRef e, bool taken, bool is_interesting) {
 
 
 # 5. pintool调试
-## 5.1 run_qsym.py脚本
+## 5.1. run_qsym.py脚本
 ```bash
 python bin/run_qsym.py -i test/1.txt -o test/out/ test/mywps 
 python bin/run_qsym.py -i test/1.txt -o test/mywps_position/out/ test/mywps_position/mywps_position
 ```
 
-## 5.2 pin命令，5.1打印出的
+## 5.2. pin命令，5.1打印出的
 ```bash
 third_party/pin-2.14-71313-gcc.4.4.7-linux/pin -pause_tool 20  -ifeellucky -t ./qsym/pintool/obj-intel64/libqsym.so -logfile test/out/pin.log -i test/1.txt -s 1 -d 1 -o test/out -- test/mywps
 
@@ -1701,7 +1703,7 @@ third_party/pin-2.14-71313-gcc.4.4.7-linux/pin  -pause_tool 20 -ifeellucky -t ./
 
 ```
 
-## 5.3 pinbin gdb
+## 5.3. pinbin gdb
 ```bash
 cd third_party/pin-2.14-71313-gcc.4.4.7-linux/intel64/bin
 gdb -q pinbin
@@ -1711,13 +1713,13 @@ dir /home/long/qsym/qsym-master/qsym/pintool  #设置源码搜索目录
 select-frame n #跳转到栈帧
 
 ```
-## 5.4 编译
+## 5.4. 编译
 ```
 python make_pintool.py
 ```
 
 # 6. z3 solver的例子
-## 6.1 github sample
+## 6.1. github sample
 ```C
 //https://github.com/Z3Prover/z3/blob/master/examples/c%2B%2B/example.cpp
 /**
@@ -1832,7 +1834,7 @@ postReadHook(SyscallContext *ctx) {
     g_memory.clearExprFromMem(ctx->arg[SYSCALL_ARG1], ctx->ret);
 }
 ```
-## 7.1 g_memory.makeExpr(ctx->arg[SYSCALL_ARG1], ctx->ret);//liu 符号化
+## 7.1. g_memory.makeExpr(ctx->arg[SYSCALL_ARG1], ctx->ret);//liu 符号化
 ```c
   inline void makeExpr(ADDRINT addr, INT32 size) {
     LOG_DEBUG("makeExpr: addr=" + hexstr(addr)
@@ -1846,7 +1848,7 @@ postReadHook(SyscallContext *ctx) {
     setExprToMem(addr, e);//liu 存入内存
   }
 ```
-### 7.1.0 LOG_DEBUG
+### 7.1.1. LOG_DEBUG
 ```c
 #define LOG_DEBUG(msg) \
   do { \
@@ -1869,7 +1871,7 @@ void log(const char* tag, const std::string &msg) {
 }
 
 ```
-### 7.1.1 ExprRef e = g_expr_builder->createRead(off_++); //liu 建立符号名称
+### 7.1.2. ExprRef e = g_expr_builder->createRead(off_++); //liu 建立符号名称
 ```c
 ExprRef BaseExprBuilder::createRead(ADDRINT off) {
   static std::vector<ExprRef> cache;
@@ -1923,7 +1925,7 @@ protected:
   UINT32 index_;
 };
 ```
-### 7.1.2 setExprToMem(addr, e);//liu 存入内存
+### 7.1.3. setExprToMem(addr, e);//liu 存入内存
 ```c
 inline void setExprToMem(ADDRINT addr, ExprRef e) {
     if (e == NULL) {
@@ -1936,11 +1938,11 @@ inline void setExprToMem(ADDRINT addr, ExprRef e) {
     }
   }
 ```
-#### 7.1.2.1 clearExprFromMem(addr);//liu 清除
+#### 7.1.3.1. clearExprFromMem(addr);//liu 清除
 ```c
 
 ```
-#### 7.1.2.2 *getExprPtrFromMem(addr) = e;//liu 赋值
+#### 7.1.3.2. *getExprPtrFromMem(addr) = e;//liu 赋值
 ```c
 inline ExprRef* getExprPtrFromMem(ADDRINT addr) {
     ExprRef* page = getPage(addr); //liu 找到页面
@@ -1952,7 +1954,7 @@ inline ExprRef* getExprPtrFromMem(ADDRINT addr) {
     return &page[addressToOffset(addr)]; //liu 找到页面里偏移
   }
 ```
-##### 7.1.2.2.1 ExprRef* page = getPage(addr); //liu 找到页面
+##### 7.1.3.2.1. ExprRef* page = getPage(addr); //liu 找到页面
 ```c
   inline ExprRef* getPage(ADDRINT addr) {
     auto it = page_table_.find(addressToPageIndex(addr));//liu std::unordered_map<ADDRINT, ExprRef*> page_table_; memory的成员变量
@@ -1962,15 +1964,15 @@ inline ExprRef* getExprPtrFromMem(ADDRINT addr) {
       return it->second;
   }
 ```
-##### 7.1.2.2.2 return &page[addressToOffset(addr)]; //liu 找到页面里偏移
+##### 7.1.3.2.2. return &page[addressToOffset(addr)]; //liu 找到页面里偏移
 ```c
 inline ADDRINT addressToOffset(ADDRINT addr) {
   return addr & kPageMask;
 }
 
 ```
-## 7.2 从求解反推
-### 7.2.1 getConcreteValues
+## 7.2. 从求解反推
+### 7.2.1. getConcreteValues
 ```c
 std::vector<UINT8> Solver::getConcreteValues() {
   // TODO: change from real input
@@ -1993,7 +1995,7 @@ std::vector<UINT8> Solver::getConcreteValues() {
   return values;
 }
 ```
-### 7.2.2 readInput初始化
+### 7.2.2. readInput初始化
 ```c
 void Solver::readInput() {
   std::ifstream ifs (input_file_, std::ifstream::in | std::ifstream::binary);
@@ -2007,7 +2009,7 @@ void Solver::readInput() {
     inputs_.push_back((UINT8)ch);//liu 读如文件内容,初始化values或者_input，文件的大小决定了vector的大小。
 }
 ```
-### 7.2.3 solver类构造函数
+### 7.2.3. solver类构造函数
 ```c
 Solver::Solver(
     const std::string input_file,
@@ -2036,7 +2038,7 @@ Solver::Solver(
   readInput();//liu 在这里初始化输入
 }
 ```
-### 7.2.4 初始化input_file
+### 7.2.4. 初始化input_file
 ```c
 void initializeGlobalContext(
     const std::string input,
@@ -2050,7 +2052,7 @@ void initializeGlobalContext(
     g_expr_builder = SymbolicExprBuilder::create();
 }
 ```
-### 7.2.5 在pintool 的main函数中初始化
+### 7.2.5. 在pintool 的main函数中初始化
 ```c
 int main(int argc, char** argv) {
   PIN_InitSymbols();
